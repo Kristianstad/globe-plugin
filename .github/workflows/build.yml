@@ -1,4 +1,4 @@
-name: Build and package the Swiper plugin
+name: Build and package the Globe plugin
 
 on:
   workflow_dispatch:
