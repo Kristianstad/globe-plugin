@@ -19,7 +19,8 @@
     "watch-sass": "sass -w --load-path scss --load-path . scss/globe.scss ../origo/plugins/globe/globe.css",
     "prebuild-sass": "sass --load-path scss --load-path . scss/globe.scss ../Tomelilla-kommun/origo/plugins/globe/globe.css",
     "build": "webpack --config ./tasks/webpack.prod.js && npm run build-sass",
-    "build-sass": "sass --load-path scss --load-path . scss/globe.scss build/globe.css"
+    "css:build": "sass --no-source-map scss/globe.scss build/globe.min.css && postcss build/globe.min.css -o build/globe.min.css --no-map --use cssnano",
+    "compress": "gzip -9kf build/globe.min.js build/globe.min.css && brotli --best --keep build/globe.min.js build/globe.min.css"
   },
   "dependencies": {
     "cesium": "1.133",
@@ -42,7 +43,7 @@
     "style-loader": "^3.3.3",
     "terser-webpack-plugin": "^5.3.14",
     "ts-loader": "^9.5.2",
-    "webpack": "^5.74.0",
+    "webpack": "^5.103.0",
     "webpack-bundle-analyzer": "^4.6.1",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.0",
