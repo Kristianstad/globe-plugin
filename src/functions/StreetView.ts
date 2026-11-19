@@ -8,32 +8,63 @@ document.body.appendChild(bottomrightDiv);
 
 let miniMapController: (ReturnType<typeof createMiniMap> & { destroy: () => void }) | null = null;
 
-
 type CleanupFn = () => void;
 
 let streetModeCleanup: CleanupFn | null = null;
+let currentScene: Cesium.Scene | null = null;
+let currentController: Cesium.ScreenSpaceCameraController | null = null;
+
+/**
+ * Force exit street mode from outside (e.g., when toggling globe off).
+ * Safe to call even if street mode is not active.
+ */
+export function forceExitStreetMode(): void {
+  if (!getIsStreetMode()) return;
+
+  try {
+    miniMapController?.destroy();
+  } finally {
+    miniMapController = null;
+  }
+
+  streetModeCleanup?.();
+  streetModeCleanup = null;
+
+  // Re-enable camera controller
+  if (currentController) {
+    Object.assign(currentController, {
+      enableZoom: true,
+      enableTilt: true,
+      enableWheelZoom: true,
+      enablePinchZoom: true,
+      enableRotate: true,
+      enableLook: false,
+      enableCollisionDetection: true,
+    });
+  }
+
+  setIsStreetMode(false);
+
+  // Hide height panel and remove active state from button
+  const heightPanel = document.getElementById('height-controls') as HTMLDivElement | null;
+  const streetBtn = document.getElementById('street-mode-toggle') as HTMLButtonElement | null;
+  if (heightPanel) heightPanel.style.display = 'none';
+  streetBtn?.classList.remove('active');
+}
 let isCameraAnimating = false;
 let isDragging = false;
 let lastMousePosition: Cesium.Cartesian2 | null = null;
 
-const MOVE_KEYS = {
-  KeyW: 'moveForward',
-  KeyS: 'moveBackward',
-  KeyA: 'moveLeft',
-  KeyD: 'moveRight',
-  KeyQ: 'moveUp',
-  KeyE: 'moveDown',
-} as const;
-
-const moveFlags = Object.fromEntries(
-  Object.values(MOVE_KEYS).map(k => [k, false])
-) as Record<(typeof MOVE_KEYS)[keyof typeof MOVE_KEYS], boolean>;
-
 export default async function setupStreetMode(
   scene: Cesium.Scene,
   handler: Cesium.ScreenSpaceEventHandler,
-  globe: any
+  globe: any,
+  name: string
 ): Promise<void> {
+  // Store references for forceExitStreetMode
+  currentScene = scene;
+  currentController = scene.screenSpaceCameraController;
+
   const heightPanel = document.getElementById('height-controls') as HTMLDivElement | null;
   const streetBtn = document.getElementById('street-mode-toggle') as HTMLButtonElement | null;
   const heightDisplay = document.getElementById('height-display');
@@ -53,10 +84,29 @@ export default async function setupStreetMode(
   };
 
   /** Adjusts camera height value */
+  /** Keeps camera height above terrain */
+  const adjustCameraHeight = () => {
+    if (isCameraAnimating) return;
+    const carto = Cesium.Cartographic.fromCartesian(scene.camera.position);
+    const groundHeight = scene.globe.getHeight(carto);
+    if (groundHeight == null) return;
+
+    const desiredHeight = groundHeight + getCameraHeight();
+    if (Math.abs(carto.height - desiredHeight) > 0.01) {
+      carto.height = desiredHeight;
+      scene.camera.position = Cesium.Cartesian3.fromRadians(
+        carto.longitude, carto.latitude, desiredHeight
+      );
+    }
+  };
+
   const adjustHeight = (delta: number) => {
     const newHeight = Math.max(1, Math.min(getCameraHeight() + delta, 9999));
     setCameraHeight(newHeight);
     updateHeightDisplay();
+    if (getIsStreetMode()) {
+      adjustCameraHeight();
+    }
   };
 
   heightUp?.addEventListener('click', () => adjustHeight(+0.05));
@@ -75,22 +125,6 @@ export default async function setupStreetMode(
     });
   };
 
-  /** Keeps camera height above terrain */
-  const adjustCameraHeight = () => {
-    if (isCameraAnimating) return;
-    const carto = Cesium.Cartographic.fromCartesian(scene.camera.position);
-    const groundHeight = scene.globe.getHeight(carto);
-    if (groundHeight == null) return;
-
-    const desiredHeight = groundHeight + getCameraHeight();
-    if (Math.abs(carto.height - desiredHeight) > 0.01) {
-      carto.height = desiredHeight;
-      scene.camera.position = Cesium.Cartesian3.fromRadians(
-        carto.longitude, carto.latitude, desiredHeight
-      );
-    }
-  };
-
   /** Smooth camera flyTo helper */
   const flyToCarto = (
     carto: Cesium.Cartographic,
@@ -105,21 +139,20 @@ export default async function setupStreetMode(
     });
   };
 
-  /** Keyboard handlers */
+  /** Keyboard handler for Escape to exit street mode */
   const streetKeyDown = (e: KeyboardEvent) => {
-    const key = MOVE_KEYS[e.code as keyof typeof MOVE_KEYS];
-    if (key) moveFlags[key] = true;
-  };
-
-  const streetKeyUp = (e: KeyboardEvent) => {
-    const key = MOVE_KEYS[e.code as keyof typeof MOVE_KEYS];
-    if (key) moveFlags[key] = false;
+    if (e.code === 'Escape') {
+      exitStreetMode();
+    }
   };
 
   /** Start street mode at a given position */
   const enterStreetMode = (position: Cesium.Cartesian3) => {
-    miniMapController = createMiniMap(globe, bottomrightDiv);
+    miniMapController = createMiniMap(globe, bottomrightDiv, name);
     miniMapController.mount();
+    
+    // Toggle active state on button
+    streetBtn?.classList.add('active');
     
     const carto = Cesium.Cartographic.fromCartesian(position);
     carto.height += getCameraHeight();
@@ -131,7 +164,6 @@ export default async function setupStreetMode(
     streetModeCleanup = () => {
       scene.postRender.removeEventListener(adjustCameraHeight);
       document.removeEventListener('keydown', streetKeyDown);
-      document.removeEventListener('keyup', streetKeyUp);
       handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOWN);
       handler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
       handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_UP);
@@ -190,7 +222,6 @@ export default async function setupStreetMode(
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     document.addEventListener('keydown', streetKeyDown);
-    document.addEventListener('keyup', streetKeyUp);
 
     flyToCarto(carto);
     setIsStreetMode(true);
@@ -216,6 +247,9 @@ export default async function setupStreetMode(
     setControllerState(false);
     setIsStreetMode(false);
     toggleDisplay(heightPanel);
+    
+    // Remove active state from button
+    streetBtn?.classList.remove('active');
 
     scene.camera.flyTo({
       destination: Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, carto.height),

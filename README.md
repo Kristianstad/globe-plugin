@@ -1,23 +1,604 @@
 # Origo globe plugin
-A plugin for [Origo map](https://github.com/origo-map/origo) to enable [CesiumJS](https://cesium.com/platform/cesiumjs/) globe using  [Ol-Cesium](https://openlayers.org/ol-cesium/)
+A plugin for [Origo map](https://github.com/origo-map/origo) to enable a [CesiumJS](https://cesium.com/platform/cesiumjs/) globe using [Ol-Cesium](https://openlayers.org/ol-cesium/).
 
-![Söderstadion](data/soderstadion.png "Söderstadion")
+<img src="data/soderstadion.png" alt="Söderstadion" title="Söderstadion" height="400px" />
 
 ## Setup
-See [index_example.html](https://github.com/haninge-geodata/origo-globe-plugin/blob/main/index_example.html) and [index_example.json](https://github.com/haninge-geodata/origo-globe-plugin/blob/main/index_example.json) to get you started with configuration.
 
-Copy files in build folder and put in Origos, plugins/globe folder.
+See [index_example.html](index_example.html) and [index_example.json](index_example.json) to get started with configuration.
 
-ℹ️ Due to loading issues ol-cesium needs to be loaded from Origo-map.
+Copy the files in the `build` folder and place them in Origo's `plugins/globe` folder.
 
-Install ol-cesium
+ℹ️ Due to loading issues, ol-cesium needs to be loaded from Origo-map.
+
+Install ol-cesium:
 ```
 npm install olcs
 ```
-In [origo.js](https://github.com/origo-map/origo/blob/master/origo.js) do
+In [origo.js](https://github.com/origo-map/origo/blob/master/origo.js), add the following two lines:
 
-```
-import OLCesium from 'olcs/OLCesium';
+```diff
+  ...
+  import layerType from './src/layer/layertype';
++ import OLCesium from 'olcs/OLCesium';
 
-window.OLCesium = OLCesium;
+  const Origo = function Origo(configPath, options = {}) {
++   window.OLCesium = OLCesium;
+    let origo;
+    ...
 ```
+## Configuration
+
+All globe settings can be configured in `index.json` under the `"3D"` section. This keeps all 3D-related configuration in one place.
+
+### Full configuration example
+
+```json
+{
+  "3D": {
+    "showGlobe": true,
+    "globeOnStart": true,
+    "viewShed": true,
+    "streetView": true,
+    "streetViewMap": "name of a layer from 'layers' config",
+    "drawTool": {
+      "active": true,
+      "options": {
+        "export": {
+          "geojson": true,
+          "dxf": true,
+          "dxfCrs": ["EPSG:3006", "EPSG:4326"]
+        },
+        "share": true,
+        "defaultColor": "white",
+        "defaultHeight": 10
+      }
+    },
+    "cameraControls": true,
+    "measure": true,
+    "quickTimeShadowPicker": true,
+    "flyTo": false,
+    "hide2DControlsInGlobe": [".o-measure", ".o-draw", ".o-search"],
+    "settings": {
+      "depthTestAgainstTerrain": true,
+      "enableAtmosphere": true,
+      "enableGroundAtmosphere": true,
+      "enableFog": false,
+      "enableLighting": true,
+      "shadows": {
+        "darkness": 0.3,
+        "fadingEnabled": true,
+        "maximumDistance": 1000,
+        "normalOffset": true,
+        "size": 4096,
+        "softShadows": false
+      },
+      "skyBox": {
+        "url": "plugins/globe/cesiumassets/Assets/Textures/SkyBox/",
+        "images": {
+          "pX": "tycho2t3_80_px.jpg",
+          "nX": "tycho2t3_80_mx.jpg",
+          "pY": "tycho2t3_80_py.jpg",
+          "nY": "tycho2t3_80_my.jpg",
+          "pZ": "tycho2t3_80_pz.jpg",
+          "nZ": "tycho2t3_80_mz.jpg"
+        }
+      }
+    },
+    "cesiumIontoken": "your-cesium-ion-token",
+    "cesiumTerrainProvider": "path/to/your/terrain"
+  }
+}
+```
+
+### Configuration options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `showGlobe` | boolean | `true` | Show/hide the globe |
+| `globeOnStart` | boolean | `false` | Automatically enable 3D mode on load |
+| `viewShed` | boolean | `false` | Enable viewshed analysis tool |
+| `streetView` | boolean | `false` | Enable street-level view mode |
+| `streetViewMap` | string | `""` | Layer name to use as ground texture in street view |
+| `cameraControls` | boolean | `false` | Show camera tilt/rotate buttons |
+| `measure` | boolean | `false` | Enable 3D measurement tools |
+| `quickTimeShadowPicker` | boolean | `false` | Enable quick time/date picker for shadows |
+| `flyTo` | boolean | `false` | Animate camera when selecting objects |
+| `hide2DControlsInGlobe` | string[] | `[]` | 2D controls that should be hidden when globe mode is active |
+| `drawTool` | object/boolean | `false` | Drawing tool configuration (see below) |
+| `cesiumIontoken` | string | - | Your Cesium Ion access token |
+| `cesiumTerrainProvider` | string | - | Path to custom terrain tiles |
+
+### Draw tool options
+
+```json
+"drawTool": {
+  "active": true,
+  "options": {
+    "export": {
+      "geojson": true,
+      "dxf": true,
+      "dxfCrs": ["EPSG:3006", "EPSG:4326"]
+    },
+    "share": true,
+    "defaultColor": "white",
+    "defaultHeight": 10
+  }
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `export.geojson` | boolean | `true` | Enable GeoJSON export |
+| `export.dxf` | boolean | `true` | Enable DXF export |
+| `export.dxfCrs` | string[] | `["EPSG:3006"]` | Coordinate systems for DXF export (see table below) |
+| `share` | boolean | `true` | Enable share URL feature |
+
+#### Available DXF coordinate systems (SWEREF99)
+
+| EPSG Code | Name | Description |
+|-----------|------|-------------|
+| `EPSG:3006` | SWEREF99 TM | National system (default) |
+| `EPSG:3007` | SWEREF99 12 00 | Local zone 12°00' |
+| `EPSG:3008` | SWEREF99 13 30 | Local zone 13°30' |
+| `EPSG:3009` | SWEREF99 15 00 | Local zone 15°00' |
+| `EPSG:3010` | SWEREF99 16 30 | Local zone 16°30' |
+| `EPSG:3011` | SWEREF99 18 00 | Local zone 18°00' |
+| `EPSG:3012` | SWEREF99 14 15 | Local zone 14°15' |
+| `EPSG:3013` | SWEREF99 15 45 | Local zone 15°45' |
+| `EPSG:3014` | SWEREF99 17 15 | Local zone 17°15' |
+| `EPSG:3015` | SWEREF99 18 45 | Local zone 18°45' |
+| `EPSG:3016` | SWEREF99 20 15 | Local zone 20°15' |
+| `EPSG:3017` | SWEREF99 21 45 | Local zone 21°45' |
+| `EPSG:3018` | SWEREF99 23 15 | Local zone 23°15' |
+| `defaultColor` | string | `"white"` | Default polygon color (white, red, green, blue, yellow, cyan) |
+| `defaultHeight` | number | `10` | Default extrusion height in meters |
+
+### Minimal configuration in index.html
+
+With the new configuration system, `index.html` only needs:
+
+```js
+origo.on('load', async (viewer) => {
+  const text = await fetch('index.json').then(r => r.text());
+  const cleaned = text // option to allow comments in index.json
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const indexJson = JSON.parse(cleaned);
+  const globe = Globe({
+    indexJson: indexJson,
+  });
+  viewer.addComponent(globe);
+});
+```
+
+Settings can still be passed directly to `Globe({...})` to override values from `index.json`.
+
+
+## Layer configuration
+
+To add 3D layers to the viewer, please see `index_example.json`.
+
+### Custom terrain tiles
+
+To add a custom terrain provider, specify it in your `index.json` under the `"3D"` section:
+
+```json
+"3D": {
+  "cesiumTerrainProvider": "path/to/your/terrain"
+}
+```
+
+### Custom 3D-tile layer
+
+Within `index.json`, add your custom 3D-tile layer as shown below:
+
+```json
+{
+    "name": "Byggnader",
+    "title": "Byggnader",
+    "type": "THREEDTILE",
+    "url": "path/to/your/3Dtiles/tileset.json",
+    "visible": true,
+    "style": {
+        "color": "color('#FFFFFF', 1)"
+    }
+}
+```
+
+Changing `style` will affect the appearance of the 3D layer.
+
+### Roof color
+
+You can customize the roof color of 3D tile buildings using either a solid color or by sampling colors from an ortofoto WMS layer.
+
+#### Solid color
+
+```json
+{
+    "name": "Byggnader",
+    "title": "Byggnader",
+    "type": "THREEDTILE",
+    "url": "path/to/your/3Dtiles/tileset.json",
+    "visible": true,
+    "roofColor": "#B87333",
+    "roofNormalThreshold": 0.7
+}
+```
+
+#### Sample from WMS ortofoto
+
+To dynamically sample roof colors from an ortofoto (aerial photo) WMS layer:
+
+```json
+{
+    "name": "Byggnader",
+    "title": "Byggnader",
+    "type": "THREEDTILE",
+    "url": "path/to/your/3Dtiles/tileset.json",
+    "visible": true,
+    "roofColor": "sample",
+    "roofColorLayer": "webservices:Ortofoto_0.16",
+    "roofColorLodDistance": 4000,
+    "roofColorImageSize": 2048,
+    "roofColorFetchRadius": 600
+}
+```
+
+#### Roof color options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `roofColor` | string | - | Hex RGB color (e.g. `"#B87333"`) or `"sample"` to sample from WMS |
+| `roofNormalThreshold` | number | `0.7` | Threshold (0-1) for roof detection. Higher = only more horizontal surfaces |
+| `roofColorLayer` | string | - | Name of a WMS layer to sample colors from (required if `roofColor: "sample"`) |
+| `roofColorLodDistance` | number | `4000` | Camera altitude (meters) to trigger high-res fetch |
+| `roofColorImageSize` | number | `2048` | Resolution of high-res ortofoto image |
+| `roofColorFetchRadius` | number | `600` | Radius (meters) for high-res fetch area |
+
+### Clipping / Mask
+
+You can clip (cut holes in) 3D tilesets where GLB models are placed, so the models are visible through the buildings. This is useful when placing detailed models inside building tilesets.
+
+#### Basic clipping (model footprint)
+
+Clip a tileset using the footprint of GLB models with a buffer:
+
+```json
+{
+    "name": "DetailedBuilding",
+    "title": "Detailed Building",
+    "type": "THREEDTILE",
+    "dataType": "model",
+    "url": "path/to/models",
+    "visible": true,
+    "models": [
+        {
+            "fileName": "building.glb",
+            "lat": 55.547,
+            "lng": 13.949,
+            "height": 66.0
+        }
+    ],
+    "mask": {
+        "Byggnader": 5
+    }
+}
+```
+
+This clips a 5-meter buffer around the model in the tileset named "Byggnader".
+
+#### Clipping with GeoJSON polygon
+
+Use a custom GeoJSON polygon for more precise clipping:
+
+```json
+{
+    "name": "DetailedBuilding",
+    "type": "THREEDTILE",
+    "dataType": "model",
+    "url": "path/to/models",
+    "visible": true,
+    "models": [...],
+    "mask": {
+        "Byggnader": {
+            "polygon": "data/mask/building_footprint.geojson"
+        },
+        "Trad": {
+            "polygon": "data/mask/mask_trees_poly.geojson",
+            "buffer": 2
+        }
+    }
+}
+```
+Multiple mask layers can be defined, and an additional buffer distance can be added.
+
+#### Mask configuration options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `polygon` | string | - | Path to GeoJSON file defining the clipping polygon |
+| `buffer` | number | `0` | Buffer distance in meters around the clipping area |
+
+### glb/gltf models
+
+To add glb/gltf models, use the example below. Several models can be added inside the array "models".
+
+```json
+{
+    "name": "GLB",
+    "title": "GLB",
+    "type": "THREEDTILE",
+    "dataType": "model",
+    "url": "path/to/your/GLB-GLTF-files",
+    "visible": true,
+    "models": [
+        {
+            "fileName": "hus1.glb",
+            "lat": 55.54734220671179,
+            "lng": 13.949731975672035,
+            "height": 66.0,
+            "heightReference": "NONE",
+            "rotHeading": 0,
+            "animation": false
+        }
+    ]
+}
+```
+
+#### Model animation options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `animation` | boolean | `false` | Enable animation playback for this model |
+| `animationDuration` | number | (native speed) | Duration in seconds for one complete animation loop |
+
+**Example with animation:**
+```json
+{
+    "fileName": "windmill.glb",
+    "lat": 55.547,
+    "lng": 13.949,
+    "height": 66.0,
+    "animation": true,
+    "animationDuration": 5
+}
+```
+
+This plays the model's animation, completing one full loop every 5 seconds. If `animationDuration` is omitted, the animation plays at its native speed.
+
+### GLB/GLTF models with WFS
+
+Origo Globe supports visualizing GLB/GLTF models placed at point features from a WFS service. This is useful for objects such as street lights, wind turbines, benches, signs, waste bins, and similar point objects.
+
+Two components are required:
+- **Model files** — GLB/GLTF files served alongside the application
+- **WFS service** — a point layer with attributes for object type, rotation, and scale
+
+> **Note:** To maintain good performance in Origo Globe, it is recommended to only request a limited area of 3D objects via WFS.
+
+```json
+{
+    "name": "geostore:objects_globe",
+    "title": "3D Objects",
+    "group": "threed",
+    "queryable": true,
+    "source": "geostore",
+    "dataSource": "https://your-wfs/",
+    "type": "THREEDTILE",
+    "visible": true,
+    "style": "none",
+    "model": {
+        "height": "hojd",
+        "width": "bred",
+        "type": "model",
+        "rotation": "rotation",
+        "types": {
+            "StreetLampDouble": {
+                "baseModel": "/data/models/StreetLampDouble.glb",
+                "modelHeight": 3
+            },
+            "StreetLampSingle": {
+                "baseModel": "/data/models/StreetLampSingle.glb",
+                "modelHeight": 3
+            },
+            "Windturbine": {
+                "baseModel": "/data/models/Windturbine.glb",
+                "modelHeight": 10,
+                "animated": true,
+                "animationDuration": 6
+            },
+            "Bench": {
+                "baseModel": "/data/models/Bench.glb",
+                "modelHeight": 1
+            }
+        }
+    }
+}
+```
+
+#### `model` configuration options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `height` | string | WFS attribute name for the object's height/scale |
+| `width` | string | WFS attribute name for the object's width/scale |
+| `type` | string | WFS attribute name that identifies the object type (maps to a key in `types`) |
+| `rotation` | string | WFS attribute name for the rotation in degrees |
+| `types` | object | Dictionary mapping type values to model configurations (see below) |
+
+#### `types` entry options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `baseModel` | string | - | Path to the GLB/GLTF model file |
+| `modelHeight` | number | - | Native height of the model in meters, used for scaling |
+| `animated` | boolean | `false` | Enable animation playback for this model type |
+| `animationDuration` | number | (native speed) | Duration in seconds for one complete animation loop |
+
+
+### Extruded 2D-layer
+
+To add 2D data as 3D extruded objects, add the layer as shown below.
+
+**Requirements:**
+- The data must have two height attributes: the height at the top of the object and the height at the bottom of the object, both relative to the geoid.
+
+Inside the `extrusion` attribute, assign the attribute values to `groundAttr` (height at the bottom of the object) and `roofAttr` (height at the top of the object).
+
+(Only tested with GeoServer)
+
+```json
+{
+    "name": "geostore:Byggnader",
+    "title": "Byggnader2D",
+    "dataSource": "https://mapserver.com/WFS",
+    "type": "THREEDTILE",
+    "dataType": "extrusion",
+    "extrusion": {
+        "groundAttr": "mark_hojd",
+        "roofAttr": "tak_hojd",
+        "color": "LIGHTGRAY",
+        "opacity": 0.9,
+        "outline": true,
+        "outlineColor": "RED"
+    },
+    "visible": true
+}
+```
+Changing `color`, `opacity`, `outline`, and `outlineColor` will affect the appearance of the layer.
+
+
+## Functions
+
+All functions described in this section can be enabled or disabled in `index.json` under the `"3D"` section.
+
+### ViewShed
+
+The ViewShed feature analyzes the visible area from a selected point, taking into account terrain and 3D objects (such as buildings and trees) that may obstruct the view.
+
+To use this function:
+1. Activate the ViewShed tool.
+2. Select the origin point for the analysis.
+3. Select the endpoint to define the direction and extent of the viewshed.
+4. Drag the blue start point to adjust the viewshed position.
+
+<img src="data/viewShed.png" alt="ViewShed" title="ViewShed" height="300px" />
+
+### StreetView
+
+The StreetView feature allows users to navigate through the 3D environment at ground level, providing an immersive experience similar to real-world street-level exploration. This feature lets you move around, look in different directions, and explore the environment as if you were walking through it.
+
+To use this function:
+1. Activate StreetView by pressing the person icon at the bottom left corner.
+2. Select the point on the map where you want to enter StreetView.
+3. To exit StreetView mode, press the person icon again.
+
+While in this mode, you can change the simulated height by pressing the up and down arrows beside the person icon, tilt the camera, and click on the ground in the viewer to pan to new areas.
+
+<img src="data/streetView.png" alt="StreetView" title="StreetView" height="400px" />
+
+### CameraControls
+
+If enabled, extra controls are added to the map in the bottom left corner.
+With these controls, the user can tilt and rotate the camera using buttons.
+
+<img src="data/cameraControls.png" alt="CameraControls" title="CameraControls" height="80px" />
+
+### Measure
+
+The 3D Measure tool provides four measurement modes:
+
+| Mode | Description |
+|------|-------------|
+| **Distance** | Measure 3D distance between two points on terrain or 3D objects |
+| **Height** | Measure vertical height difference between two points |
+| **Footprint** | Measure horizontal projected area (like looking straight down) - useful for land plots and building footprints |
+| **Surface** | Measure true surface area - useful for roofs, walls, slopes, and terrain |
+
+#### Footprint vs Surface Area
+
+| Tool | What it measures | Example (10×10m roof at 45° pitch) |
+|------|------------------|-------------------------------------|
+| **Footprint** | Horizontal projection — the "shadow" area as seen from above | ~100 m² |
+| **Surface** | True 3D surface area — the actual tilted/curved surface | ~141 m² |
+
+**Use Footprint for:** Land parcels, building coverage, floor plans, zoning calculations  
+**Use Surface for:** Roofing materials, painting walls, grass seed for slopes, actual material estimates
+
+To use:
+1. Select measurement mode from the toolbar.
+2. For distance/height: click two points on the map.
+3. For footprint/surface area: click multiple points to define the polygon, then right-click to complete.
+4. Use the clear button to remove all measurements.
+
+<img src="data/measure.png" alt="Measure" title="Measure" height="340px" />
+
+### QuickTimeShadowPicker
+
+Enables quick access to dates and times of equinoxes and solstices for shadow analysis.
+
+<img src="data/quickTimeShadowPicker.png" alt="QuickTimeShadowPicker" title="QuickTimeShadowPicker" height="340px" />
+
+### FlyTo
+
+If activated, FlyTo will animate the camera to pan and zoom to focus on the selected object.
+
+### Draw
+
+The Draw tool allows you to create 3D extruded polygons and rectangles on the map. By activating draw, you get a toolbar at the bottom of the screen.
+
+#### Drawing tools
+
+| Tool | Description |
+|------|-------------|
+| **Polygon** | Draw freeform polygons by clicking corners. Right-click to finish. |
+| **Rectangle** | Draw rectangles by clicking two opposite corners. |
+
+#### Toolbar buttons
+
+| Button | Description |
+|--------|-------------|
+| Height | Set the extrusion height (in meters) for new polygons |
+| Color | Choose fill color (white, red, green, blue, yellow, cyan) |
+| Opacity | Toggle between transparent (70%) and opaque (100%) |
+| Clear | Remove all drawn polygons |
+| Labels | Toggle polygon information labels on/off |
+| Share | Copy a shareable URL to clipboard containing all drawn polygons |
+| Download | Export polygons as GeoJSON or DXF (with configurable coordinate systems) |
+
+#### Editing individual polygons
+
+Click on any drawn polygon to select it. A secondary toolbar appears with editing options:
+
+| Option | Description |
+|--------|-------------|
+| Name | Edit the polygon's name |
+| Height | Change the extrusion height |
+| Color | Change the fill color |
+| Opacity | Toggle transparency |
+| Delete | Remove this polygon |
+| Deselect | Close the edit panel |
+
+The polygon outline turns yellow when selected.
+
+#### Polygon labels
+
+Each polygon displays information including:
+- Name
+- Base height (terrain level)
+- Extrusion height
+- Top elevation (base + extrusion)
+- Area in m²
+
+#### Export formats
+
+- **GeoJSON 2D (EPSG:4326)**: Standard GeoJSON with 2D coordinates. Properties include extrudeHeight, baseHeight, area, color, and fillAlpha for 3D reconstruction.
+- **DXF 3D**: AutoCAD-compatible format with full 3D geometry, supports multiple coordinate systems (SWEREF99 zones)
+
+#### Sharing
+
+The share button creates a URL containing all drawn polygons. When someone opens the link:
+- 3D mode activates automatically
+- All shared polygons are loaded and displayed
+- The view zooms to fit all polygons
